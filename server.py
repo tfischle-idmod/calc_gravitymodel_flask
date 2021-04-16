@@ -1,9 +1,14 @@
-from flask import Flask, request
+from flask import Flask, request, send_from_directory, abort
 from werkzeug.utils import secure_filename
 import json
 import os
+import uuid
+import zipfile
+
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = "uploads"
+app.config['PROCESSED_FOLDER'] = "processed"
 
 
 @app.route('/')
@@ -35,15 +40,41 @@ def input_filename():
 def upload_file():
     if request.method == 'POST':
         f = request.files['file']
-        f.save(secure_filename(f.filename))
-        return 'file uploaded successfully'
+        random_uuid = uuid.uuid4()
+        f.save(os.path.join(app.config['UPLOAD_FOLDER'], str(random_uuid)))
+        return str(random_uuid)
 
 
 @app.route('/params', methods=['GET', 'POST'])
 def upload_params():
     if request.method == 'POST':
         input_json = request.get_json(force=True)
-        return 'received json: ' + str(input_json)
+        path = os.path.join(app.config['UPLOAD_FOLDER'], input_json["uuid"])
+
+        with open(path, "r") as f:
+            reference = json.load(f)
+
+        # Do processing and save file
+        param2 = input_json["param2"]
+        reference["Returned"] = True
+        reference[param2] = "Test"
+
+        job_uuid = uuid.uuid4()
+        path = os.path.join(app.config['PROCESSED_FOLDER'], str(job_uuid) + ".zip")
+
+        with zipfile.ZipFile(path, "w") as z:
+            zipfile.ZipFile.writestr(z, "result.json", str(reference))
+
+        return str(job_uuid)
+
+    elif request.method == 'GET':
+        input_json = request.get_json(force=True)
+        zip_file = str(input_json['job_uuid']) + ".zip"
+        try:
+            return send_from_directory(app.config["PROCESSED_FOLDER"], filename=zip_file, as_attachment=True)
+        except FileNotFoundError:
+            abort(404)
+
 
 
 if __name__ == '__main__':
