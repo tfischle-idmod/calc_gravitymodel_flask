@@ -2,7 +2,8 @@
 import requests
 
 parameters = {"param1": "parameter1", "param2": "123"}
-dictToSend = {'file': open("demographics_test.json", "r")}
+#dictToSend = {'file': open("demographics_test.json", "r")}
+dictToSend = {'file': open("demographics.json", "r")}
 
 res = requests.post('http://localhost:3134/uploader', files=dictToSend)
 print("response from server:", res.text)

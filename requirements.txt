@@ -2,4 +2,7 @@ flask
 werkzeug
 requests
 Flask-UUID
+pycuda
+numpy
+
 

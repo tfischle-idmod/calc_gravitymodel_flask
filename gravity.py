@@ -10,7 +10,7 @@ from pycuda.compiler import SourceModule
 def get_kernel():
     kernel = SourceModule("""
         #include <cstdint>
-        #include <cfloat>
+        #include <cfloat>        
 
         __global__ void distance(
             uint32_t count,     // size of incoming vectors (1D) and outgoing rates (2D)
@@ -27,6 +27,7 @@ def get_kernel():
         {
             uint32_t x = blockIdx.x * blockDim.x + threadIdx.x;
             uint32_t y = blockIdx.y * blockDim.y + threadIdx.y;
+            const double M_PI = 3.14;
 
             if ( (x < count) && (y < count) )
             {
@@ -133,7 +134,7 @@ def get_kernel():
     return kernel_fn
 
 
-def from_json(filename: Path, parameters: dict) -> Path:
+def from_json(filename: Path, out_path: Path, parameters: dict) -> Path:
 
     with filename.open("rt") as input:
         jason = json.load(input)
@@ -150,7 +151,8 @@ def from_json(filename: Path, parameters: dict) -> Path:
 
     distances, rates = calculate_rates(lat, lon, pop, parameters)
 
-    output = Path(__file__).parent.absolute() / "results" / (filename.stem + ".npy")
+    #output = Path(__file__).parent.absolute() / "results" / (filename.stem + ".npy")
+    output = Path(out_path, filename.stem + ".npy")
     np.save(output, rates)
 
     return output

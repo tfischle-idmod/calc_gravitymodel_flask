@@ -4,11 +4,14 @@ import json
 import os
 import uuid
 import zipfile
+import gravity
+import pathlib
 
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = "uploads"
 app.config['PROCESSED_FOLDER'] = "processed"
+app.config['RESULTS_FOLDER'] = "results"
 
 
 @app.route('/')
@@ -54,6 +57,13 @@ def upload_params():
         with open(path, "r") as f:
             reference = json.load(f)
 
+        filename = pathlib.Path(path)
+        out_dir = pathlib.Path(app.config['RESULTS_FOLDER'])
+        results = gravity.from_json(filename, out_dir, request.args)
+        with results.open("rb") as file:
+            data = file.read()
+        # print(data)
+
         # Do processing and save file
         param2 = input_json["param2"]
         reference["Returned"] = True
@@ -80,5 +90,6 @@ def upload_params():
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
     app.run(debug=True, port=3134)
 
