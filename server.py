@@ -7,23 +7,10 @@ import zipfile
 import gravity
 import pathlib
 
-
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = "uploads"
 app.config['PROCESSED_FOLDER'] = "processed"
 app.config['RESULTS_FOLDER'] = "results"
-
-
-@app.route('/')
-def display():
-    return "Looks like it works!"
-
-
-# 127.0.0.1:3134/test
-@app.route('/test')
-def reply_test():
-    return "Some reply"
-
 
 # 127.0.0.1:3134/input?filename=demographics.json
 @app.route('/input')
@@ -39,7 +26,7 @@ def input_filename():
         return "No input file specified"
 
 
-@app.route('/uploader', methods=['GET', 'POST'])
+@app.route('/uploader', methods=['POST'])
 def upload_file():
     if request.method == 'POST':
         f = request.files['file']
@@ -48,32 +35,29 @@ def upload_file():
         return str(random_uuid)
 
 
-@app.route('/params', methods=['GET', 'POST'])
-def upload_params():
+@app.route('/process', methods=['GET', 'POST'])
+def process_files():
     if request.method == 'POST':
         input_json = request.get_json(force=True)
-        path = os.path.join(app.config['UPLOAD_FOLDER'], input_json["uuid"])
-
-        with open(path, "r") as f:
-            reference = json.load(f)
-
+        path = pathlib.Path(app.config['UPLOAD_FOLDER'], input_json["uuid"])
         filename = pathlib.Path(path)
-        out_dir = pathlib.Path(app.config['RESULTS_FOLDER'])
-        results = gravity.from_json(filename, out_dir, request.args)
-        with results.open("rb") as file:
-            data = file.read()
-        # print(data)
 
-        # Do processing and save file
-        param2 = input_json["param2"]
-        reference["Returned"] = True
-        reference[param2] = "Test"
+        if not pathlib.Path(filename).is_file():
+            error_msg = "No input file found. '" + str(filename) + "' does not exist."
+            return abort(400, error_msg)
 
+        out_dir = pathlib.Path(app.config['PROCESSED_FOLDER'])
+        results_path = gravity.from_json(filename, out_dir, request.args)
+
+        # create unique zip file and add result from gravity module
         job_uuid = uuid.uuid4()
-        path = os.path.join(app.config['PROCESSED_FOLDER'], str(job_uuid) + ".zip")
+        path = pathlib.Path(app.config['RESULTS_FOLDER'], str(job_uuid) + ".zip")
+        input_json['job_uuid'] = job_uuid
 
         with zipfile.ZipFile(path, "w") as z:
-            zipfile.ZipFile.writestr(z, "result.json", str(reference))
+            zipfile.ZipFile.write(z, results_path)
+            zipfile.ZipFile.write(z, filename)
+            zipfile.ZipFile.writestr(z, "parameters.json", data=str(input_json))
 
         return str(job_uuid)
 
@@ -81,15 +65,19 @@ def upload_params():
         input_json = request.get_json(force=True)
         zip_file = str(input_json['job_uuid']) + ".zip"
         try:
-            return send_from_directory(app.config["PROCESSED_FOLDER"], filename=zip_file, as_attachment=True)
+            return send_from_directory(app.config["RESULTS_FOLDER"], filename=zip_file, as_attachment=True)
         except FileNotFoundError:
-            abort(404)
+            error_msg = "Requested file not found. " + zip_file + " does not exist."
+            abort(400, error_msg)
 
-
-
-if __name__ == '__main__':
+def run():
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True)
     os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
-    app.run(debug=True, port=3134)
+    app.run(debug=True, host='127.0.0.1', port=3135)
+
+
+if __name__ == '__main__':
+    run()
+
 

@@ -4,5 +4,6 @@ requests
 Flask-UUID
 pycuda
 numpy
+pytest
 
 
